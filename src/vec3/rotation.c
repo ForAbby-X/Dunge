@@ -66,10 +66,9 @@ t_v3f	v3frot(t_v3f vec, t_v2f rot)
 t_v2f	v3flook(t_v3f from, t_v3f to)
 {
 	t_v3f const	diff = to - from;
-	float const	dist = v3fmag(diff);
 	t_v2f		ret;
 
 	ret[x] = atan2(diff[z], diff[x]);
-	ret[y] = asinf(diff[y]) / dist;
+	ret[y] = atan2(diff[y], sqrtf(diff[x] * diff[x] + diff[z] * diff[z]));
 	return (ret);
 }
