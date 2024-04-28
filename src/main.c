@@ -53,33 +53,34 @@ t_arm	*arms_add(t_vector *const arms, t_v3f pos, t_v2f rot, t_v3f size)
 	return (vector_addback(arms, &arm));
 }
 
-float limit_rotation(float current_angle, float target_value, float max_rotation, float offset) {
-	// Calculate the angle difference
-	float angle_difference = target_value - current_angle;
-	
-	// Use modular arithmetic to get the smallest positive angle
-	float limited_rotation = fmodf(angle_difference + M_PI, 2 * M_PI) - M_PI;
-	
-	// Calculate the adjusted maximum rotation based on the offset
-	float adjusted_max_rotation = max_rotation;
-	if (current_angle < target_value)
-		adjusted_max_rotation += offset;
-	else
-		adjusted_max_rotation -= offset;
-	
-	// Check if the limited rotation is within the adjusted maximum allowed range
-	if (limited_rotation >= -adjusted_max_rotation && limited_rotation <= adjusted_max_rotation)
-		return current_angle + limited_rotation;
-	// If exceeding the maximum allowed range, return the angle with the adjusted maximum allowed rotation
-	return current_angle + (limited_rotation > 0 ? adjusted_max_rotation : -adjusted_max_rotation);
+float normalize( const float value, const float start, const float end ) 
+{
+  const float width       = end - start   ;   // 
+  const float offsetValue = value - start ;   // value relative to 0
+
+  return ( offsetValue - ( floor( offsetValue / width ) * width ) ) + start ;
+  // + start to reset back to start of original range
 }
 
-t_v2f	limit_v2rot(t_v2f current_rot, t_v2f target_rot, t_v2f max_rot, t_v2f offset)
+float limit_rotation(float in_angle, float center_angle, float max_rotation)
+{
+	float const	_in = normalize(in_angle, -M_PI, M_PI);
+	float const	_cen = normalize(center_angle, -M_PI, M_PI);
+	float const diff_angle = fabsf(_in - _cen);
+	float const fixed_angle = fmodf(diff_angle, M_PI);
+	float const	clamped_rot = fminf(fixed_angle, max_rotation);
+
+	if (_in < _cen)
+		return (_cen - clamped_rot);
+	return (_cen + clamped_rot);
+}
+
+t_v2f	limit_v2rot(t_v2f target_rot, t_v2f center_rot, t_v2f max_rot)
 {
 	t_v2f	limited_rot;
 	
-	limited_rot[x] = limit_rotation(current_rot[x], target_rot[x], max_rot[x], offset[x]);
-	limited_rot[y] = limit_rotation(current_rot[y], target_rot[y], max_rot[y], offset[y]);
+	limited_rot[x] = limit_rotation(target_rot[x], center_rot[x], max_rot[x]);
+	limited_rot[y] = limit_rotation(target_rot[y], center_rot[y], max_rot[y]);
 	
 	return (limited_rot);
 }
@@ -92,37 +93,38 @@ void	arms_point_to(t_vector *const arms, t_v3f start_pos, t_v3f target_pos)
 	t_v3f		temp_pos;
 	t_v2f		last_rot;
 	
-	i = vector_size(arms) - 1;
 	temp_pos = target_pos;
 	last_rot = (t_v2f){0.0f, 0.0f};
+
+	i = vector_size(arms) - 1;
 	while (i >= 0)
 	{
 		arm = vector_get(arms, i);
+		last_rot = arm->rot;
 
-		arm->rot = limit_v2rot(arm->rot, v3flook(arm->pos, temp_pos), (t_v2f){0.4f, 0.4f}, last_rot);
+		arm->rot = limit_v2rot(v3flook(arm->pos, temp_pos), last_rot, (t_v2f){M_PI, M_PI} * 0.2f);
 
 		arm->pos = temp_pos - v3frot((t_v3f){arm->size[x]}, arm->rot);
 
-		last_rot = arm->rot;
 		temp_pos = arm->pos;
 		i--;
 	}
-(void)start_pos;
-	// i = 0;
-	// temp_pos = start_pos;
-	// float size = 0.0f;
-	// while (i < (int)vector_size(arms))
-	// {
-	// 	arm = vector_get(arms, i);
 
-	// 	// temp_rot = limit_v2rot(temp_rot, v3flook(arm->pos, temp_pos), (t_v2f){0.4f, 0.4f}, last_rot);
-		
-	// 	arm->pos = temp_pos - v3frot((t_v3f){size}, arm->rot);
-		
-	// 	temp_pos = arm->pos;
-	// 	size = arm->size[x];
-	// 	i++;
-	// }
+	t_arm *first_arm = vector_get(arms, 0);
+
+	if (first_arm == NULL)
+		return ;
+
+	t_v3f const diff = first_arm->pos - start_pos;
+
+	i = 0;
+	while (i < (int)vector_size(arms))
+	{
+		arm = vector_get(arms, i);
+
+		arm->pos -= diff;
+		i++;
+	}
 }
 
 void	arms_render(t_engine *const eng, t_camera *const cam, t_data *const game, t_vector *const arms)
@@ -197,11 +199,11 @@ static inline void __control(
 	t_v3f vel;
 
 	vel = (t_v3f){0};
-	if (ft_key(eng, 'w').hold)
+	if (ft_key(eng, 'z').hold)
 		vel += dir;
 	if (ft_key(eng, 's').hold)
 		vel -= dir;
-	if (ft_key(eng, 'a').hold)
+	if (ft_key(eng, 'q').hold)
 		vel -= (t_v3f){-dir[z], 0.f, dir[x]};
 	if (ft_key(eng, 'd').hold)
 		vel += (t_v3f){-dir[z], 0.f, dir[x]};
@@ -214,6 +216,8 @@ static inline void __control(
 	game->cam.rot[x] += ((float)eng->mouse_x - 500) * (0.2f / 100.f);
 	game->cam.rot[y] -= ((float)eng->mouse_y - 230 * 3 / 2) * (0.2f / 100.f);
 	mlx_mouse_move(eng->mlx, eng->win, 500, 230 * 3 / 2);
+
+	game->cam.rot[y] = limit_rotation(game->cam.rot[y], 0.f, M_PI_2);
 
 	game->cam.pos += vel * dt * 2.f;
 }
