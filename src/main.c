@@ -1,110 +1,128 @@
 /* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   main.c                                             :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: alde-fre <alde-fre@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2023/06/21 10:36:00 by alde-fre          #+#    #+#             */
-/*   Updated: 2024/04/27 18:01:19 by alde-fre         ###   ########.fr       */
-/*                                                                            */
+/*																			*/
+/*														:::	  ::::::::   */
+/*   main.c											 :+:	  :+:	:+:   */
+/*													+:+ +:+		 +:+	 */
+/*   By: alde-fre <alde-fre@student.42.fr>		  +#+  +:+	   +#+		*/
+/*												+#+#+#+#+#+   +#+		   */
+/*   Created: 2023/06/21 10:36:00 by alde-fre		  #+#	#+#			 */
+/*   Updated: 2024/04/28 18:04:13 by alde-fre		 ###   ########.fr	   */
+/*																			*/
 /* ************************************************************************** */
 
 #include "engine.h"
 #include "model.h"
 
-// #include "particle/particle.h"
+///////////////////////////////////////////////////////
 
 typedef struct s_arm
 {
-	t_v3f pos;
-	t_v2f rot;
-	t_v3f size;
-} t_arm;
+	t_v3f	pos;
+	t_v2f	rot;
+	t_v3f	size;
+	
+}	t_arm;
 
 typedef struct s_data
 {
-	t_camera cam;
+	t_camera	cam;
 
-	t_mesh sphere;
-	t_mesh cube;
+	t_mesh		sphere;
+	t_mesh		cube;
 
-	t_v3f pos;
-	t_v2f rot;
+	t_v3f		pos;
+	t_v2f		rot;
 
-	t_vector arms;
+	t_vector	arms;
 
-	float time;
-} t_data;
+	t_v3f		target;
+
+	float		time;
+}	t_data;
 
 ///////////////////////////////////////////////////////
 
-t_arm *arms_add(t_vector *const arms, t_v3f pos, t_v2f rot, t_v3f size)
+t_arm	*arms_add(t_vector *const arms, t_v3f pos, t_v2f rot, t_v3f size)
 {
 	t_arm arm;
 
 	arm.pos = pos;
 	arm.rot = rot;
 	arm.size = size;
+	
 	return (vector_addback(arms, &arm));
 }
 
-void	arms_point_to(t_vector *const arms, t_v3f start, t_v3f target_pos)
+float limit_rotation(float current_angle, float target_value, float max_rotation, float offset) {
+	// Calculate the angle difference
+	float angle_difference = target_value - current_angle;
+	
+	// Use modular arithmetic to get the smallest positive angle
+	float limited_rotation = fmodf(angle_difference + M_PI, 2 * M_PI) - M_PI;
+	
+	// Calculate the adjusted maximum rotation based on the offset
+	float adjusted_max_rotation = max_rotation;
+	if (current_angle < target_value)
+		adjusted_max_rotation += offset;
+	else
+		adjusted_max_rotation -= offset;
+	
+	// Check if the limited rotation is within the adjusted maximum allowed range
+	if (limited_rotation >= -adjusted_max_rotation && limited_rotation <= adjusted_max_rotation)
+		return current_angle + limited_rotation;
+	// If exceeding the maximum allowed range, return the angle with the adjusted maximum allowed rotation
+	return current_angle + (limited_rotation > 0 ? adjusted_max_rotation : -adjusted_max_rotation);
+}
+
+t_v2f	limit_v2rot(t_v2f current_rot, t_v2f target_rot, t_v2f max_rot, t_v2f offset)
+{
+	t_v2f	limited_rot;
+	
+	limited_rot[x] = limit_rotation(current_rot[x], target_rot[x], max_rot[x], offset[x]);
+	limited_rot[y] = limit_rotation(current_rot[y], target_rot[y], max_rot[y], offset[y]);
+	
+	return (limited_rot);
+}
+
+
+void	arms_point_to(t_vector *const arms, t_v3f start_pos, t_v3f target_pos)
 {
 	t_arm		*arm;
 	int			i;
-	int			count_iter;
 	t_v3f		temp_pos;
-
-	count_iter = 1;
-	while (count_iter)
+	t_v2f		last_rot;
+	
+	i = vector_size(arms) - 1;
+	temp_pos = target_pos;
+	last_rot = (t_v2f){0.0f, 0.0f};
+	while (i >= 0)
 	{
-		count_iter = 1;
-		i = 0;
-		temp_pos = target_pos;
-		while (i < (int)vector_size(arms))
-		{
-			arm = vector_get(arms, i);
-			
-			arm->rot = v3flook(arm->pos, temp_pos);
+		arm = vector_get(arms, i);
 
-			float	dist = v3fmag(arm->pos - temp_pos) - arm->size[x] / 2.f;
+		arm->rot = limit_v2rot(arm->rot, v3flook(arm->pos, temp_pos), (t_v2f){0.4f, 0.4f}, last_rot);
 
-			if (dist < 0.1f)
-				count_iter = 0;
-			else
-				arm->pos += v3frot((t_v3f){dist / 2.f}, arm->rot);
+		arm->pos = temp_pos - v3frot((t_v3f){arm->size[x]}, arm->rot);
 
-			temp_pos = arm->pos + v3frot((t_v3f){arm->size[x] / 2.f}, arm->rot);
-
-			i++;
-		}
-		i = (int)vector_size(arms) - 1;
-		while (i >= 0)
-		{
-			arm = vector_get(arms, i);
-			
-			if (i > 0)
-				temp_pos = ((t_arm *)vector_get(arms, i - 1))->pos;
-			else
-				temp_pos = start;
-
-			printf("i: %d\n", i);
-
-			arm->rot = v3flook(arm->pos, temp_pos);
-
-			float	dist = v3fmag(arm->pos - temp_pos) - arm->size[x] / 2.f;
-
-			if (dist < 0.1f)
-				count_iter = 0;
-			else
-				arm->pos += v3frot((t_v3f){dist / 2.f}, arm->rot);
-
-			temp_pos = arm->pos + v3frot((t_v3f){arm->size[x] / 2.f}, arm->rot);
-
-			i--;
-		}
+		last_rot = arm->rot;
+		temp_pos = arm->pos;
+		i--;
 	}
+(void)start_pos;
+	// i = 0;
+	// temp_pos = start_pos;
+	// float size = 0.0f;
+	// while (i < (int)vector_size(arms))
+	// {
+	// 	arm = vector_get(arms, i);
+
+	// 	// temp_rot = limit_v2rot(temp_rot, v3flook(arm->pos, temp_pos), (t_v2f){0.4f, 0.4f}, last_rot);
+		
+	// 	arm->pos = temp_pos - v3frot((t_v3f){size}, arm->rot);
+		
+	// 	temp_pos = arm->pos;
+	// 	size = arm->size[x];
+	// 	i++;
+	// }
 }
 
 void	arms_render(t_engine *const eng, t_camera *const cam, t_data *const game, t_vector *const arms)
@@ -157,9 +175,12 @@ static inline void __init(t_engine *const eng, t_data *game)
 
 	game->arms = vector_create(sizeof(t_arm));
 
-	for (int i = 0; i < 4; i++)
+	game->target = game->cam.pos;
+
+	for (int i = 0; i < 15; i++)
 	{
-		arms_add(&game->arms, (t_v3f){0.f, i, 0.f}, (t_v2f){0.f, 0.f}, (t_v3f){0.4f, 0.1f, 0.1f});
+		float width = (15 - i + 1) / 15.f;
+		arms_add(&game->arms, (t_v3f){0.f, 0.1f, 0.f}, (t_v2f){0.f, 0.f}, (t_v3f){width, width, width} / 10.f);
 	}
 
 	game->time = 0.0;
@@ -176,11 +197,11 @@ static inline void __control(
 	t_v3f vel;
 
 	vel = (t_v3f){0};
-	if (ft_key(eng, 'z').hold)
+	if (ft_key(eng, 'w').hold)
 		vel += dir;
 	if (ft_key(eng, 's').hold)
 		vel -= dir;
-	if (ft_key(eng, 'q').hold)
+	if (ft_key(eng, 'a').hold)
 		vel -= (t_v3f){-dir[z], 0.f, dir[x]};
 	if (ft_key(eng, 'd').hold)
 		vel += (t_v3f){-dir[z], 0.f, dir[x]};
@@ -210,8 +231,13 @@ static inline int __loop(t_engine *eng, t_data *game, double dt)
 	// game->cam.rot = v3flook(game->cam.pos, (t_v3f){0.f, 0.f, 0.f});
 	camera_update(&game->cam);
 
-	t_v3f target = game->cam.pos + v3frot((t_v3f){1.f, 0.f, 0.f}, game->cam.rot) * 1.f;
-	arms_point_to(&game->arms, (t_v3f){0.f, .25f, 0.f}, target);
+
+	t_v3f	diff = game->cam.pos - game->target;
+	if (diff[x] * diff[x] + diff[y] * diff[y] + diff[z] * diff[z] > 0.25f * 0.25f)
+		game->target += v3fnorm(diff, 1.f) * (float)dt * 0.5f;
+
+	t_v3f target = game->target;
+	arms_point_to(&game->arms, (t_v3f){0.f, 0.f, 0.f}, target);
 
 	camera_update(&game->cam);
 	ft_eng_sel_spr(eng, game->cam.surface);
@@ -223,10 +249,10 @@ static inline int __loop(t_engine *eng, t_data *game, double dt)
 	// t_v3f cam_dir = v3frot((t_v3f){1.f, 0.f, 0.f}, game->cam.rot);
 
 	// Display the sphere
-	mesh_put(eng, &game->cam, (t_transform){{0.f, 0.f}, {.125f, .125f, .125f}, target}, &game->sphere);
+	mesh_put(eng, &game->cam, (t_transform){{0.f, 0.f}, {.0125f, .0125f, .0125f}, target}, &game->sphere);
 
 	// Display the cube
-	mesh_put(eng, &game->cam, (t_transform){{0.f, 0.f}, {0.5f, 0.5f, 0.5f}, (t_v3f){0.f, 0.f, 0.f}}, &game->cube);
+	mesh_put(eng, &game->cam, (t_transform){{0.f, 0.f}, {0.125f, 0.125f, 0.125f}, (t_v3f){0.f, 0.f, 0.f}}, &game->sphere);
 
 	arms_render(eng, &game->cam, game, &game->arms);
 
