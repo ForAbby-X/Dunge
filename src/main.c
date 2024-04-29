@@ -66,11 +66,12 @@ float limit_rotation(float in_angle, float center_angle, float max_rotation)
 {
 	float const	_in = normalize(in_angle, -M_PI, M_PI);
 	float const	_cen = normalize(center_angle, -M_PI, M_PI);
-	float const diff_angle = fabsf(_in - _cen);
-	float const fixed_angle = fmodf(diff_angle, M_PI);
+	float const diff_angle = _in - _cen;
+	float const	abs_angle = fabsf(diff_angle);
+	float const fixed_angle = fmodf(abs_angle, M_PI);
 	float const	clamped_rot = fminf(fixed_angle, max_rotation);
 
-	if (_in < _cen)
+	if (diff_angle < 0)
 		return (_cen - clamped_rot);
 	return (_cen + clamped_rot);
 }
@@ -88,41 +89,36 @@ t_v2f	limit_v2rot(t_v2f target_rot, t_v2f center_rot, t_v2f max_rot)
 
 void	arms_point_to(t_vector *const arms, t_v3f start_pos, t_v3f target_pos)
 {
-	t_arm		*arm;
-	int			i;
-	t_v3f		temp_pos;
-	t_v2f		last_rot;
-	
-	temp_pos = target_pos;
-	last_rot = (t_v2f){0.0f, 0.0f};
+	t_arm	*arm;
+	int		i;
+	t_v3f	temp_pos;
+	t_v3f	next_pos;
+	float	last_size;
 
+	temp_pos = target_pos;
 	i = vector_size(arms) - 1;
 	while (i >= 0)
 	{
 		arm = vector_get(arms, i);
-		last_rot = arm->rot;
-
-		arm->rot = limit_v2rot(v3flook(arm->pos, temp_pos), last_rot, (t_v2f){M_PI, M_PI} * 0.2f);
-
+		arm->rot = v3flook(arm->pos, temp_pos);
 		arm->pos = temp_pos - v3frot((t_v3f){arm->size[x]}, arm->rot);
-
 		temp_pos = arm->pos;
 		i--;
 	}
-
-	t_arm *first_arm = vector_get(arms, 0);
-
-	if (first_arm == NULL)
-		return ;
-
-	t_v3f const diff = first_arm->pos - start_pos;
-
+	temp_pos = start_pos;
+	last_size = 0.f;
 	i = 0;
 	while (i < (int)vector_size(arms))
 	{
 		arm = vector_get(arms, i);
-
-		arm->pos -= diff;
+		if (i < (int)vector_size(arms) - 1)
+			next_pos = ((t_arm *)vector_get(arms, i + 1))->pos;
+		else
+			next_pos = target_pos;
+		arm->rot = v3flook(arm->pos, next_pos);
+		arm->pos = temp_pos + v3fnorm(arm->pos - temp_pos,last_size);
+		temp_pos = arm->pos;
+		last_size = arm->size[x];
 		i++;
 	}
 }
@@ -139,6 +135,8 @@ void	arms_render(t_engine *const eng, t_camera *const cam, t_data *const game, t
 		arm = vector_get(arms, i);
 		trans.rotation = arm->rot;
 		trans.resize = arm->size;
+		trans.resize[y] = 0.01f;
+		trans.resize[z] = 0.01f;
 		trans.translation = arm->pos + v3frot((t_v3f){arm->size[x] / 2.f}, arm->rot);
 
 		mesh_put(eng, cam, trans, &game->cube);
@@ -148,17 +146,17 @@ void	arms_render(t_engine *const eng, t_camera *const cam, t_data *const game, t
 
 ///////////////////////////////////////////////////////
 
-// static inline float __ray_plane(
-// 	t_v3f const ray,
-// 	t_v3f const ray_origin,
-// 	t_v3f const plane_point)
-// {
-// 	t_v3f const plane_to_ray = plane_point - ray_origin;
+static inline float __ray_plane(
+	t_v3f const ray,
+	t_v3f const ray_origin,
+	t_v3f const plane_point)
+{
+	t_v3f const plane_to_ray = plane_point - ray_origin;
 
-// 	float const denom = plane_to_ray[y] / ray[y];
+	float const denom = plane_to_ray[y] / ray[y];
 
-// 	return (denom);
-// }
+	return (denom);
+}
 
 ///////////////////////////////////////////////////////
 
@@ -179,10 +177,10 @@ static inline void __init(t_engine *const eng, t_data *game)
 
 	game->target = game->cam.pos;
 
-	for (int i = 0; i < 15; i++)
+	for (int i = 0; i < 100; i++)
 	{
 		float width = (15 - i + 1) / 15.f;
-		arms_add(&game->arms, (t_v3f){0.f, 0.1f, 0.f}, (t_v2f){0.f, 0.f}, (t_v3f){width, width, width} / 10.f);
+		arms_add(&game->arms, (t_v3f){0.f, 0.1f, 0.f}, (t_v2f){0.f, 0.f}, (t_v3f){0.1f, width, width} / 10.f);
 	}
 
 	game->time = 0.0;
@@ -199,11 +197,11 @@ static inline void __control(
 	t_v3f vel;
 
 	vel = (t_v3f){0};
-	if (ft_key(eng, 'z').hold)
+	if (ft_key(eng, 'w').hold)
 		vel += dir;
 	if (ft_key(eng, 's').hold)
 		vel -= dir;
-	if (ft_key(eng, 'q').hold)
+	if (ft_key(eng, 'a').hold)
 		vel -= (t_v3f){-dir[z], 0.f, dir[x]};
 	if (ft_key(eng, 'd').hold)
 		vel += (t_v3f){-dir[z], 0.f, dir[x]};
@@ -240,8 +238,15 @@ static inline int __loop(t_engine *eng, t_data *game, double dt)
 	if (diff[x] * diff[x] + diff[y] * diff[y] + diff[z] * diff[z] > 0.25f * 0.25f)
 		game->target += v3fnorm(diff, 1.f) * (float)dt * 0.5f;
 
-	t_v3f target = game->target;
-	arms_point_to(&game->arms, (t_v3f){0.f, 0.f, 0.f}, target);
+	// Get cam dir
+	t_v3f cam_dir = v3frot((t_v3f){1.f, 0.f, 0.f}, game->cam.rot);
+	t_v3f target = game->cam.pos + cam_dir * __ray_plane(cam_dir, game->cam.pos, (t_v3f){0.f, 0.f, 0.f});
+	// target[y] = 0.01f;
+	target = game->target;
+
+
+	arms_point_to(&game->arms, (t_v3f){0.f, 0.5f, 0.f}, target);
+
 
 	camera_update(&game->cam);
 	ft_eng_sel_spr(eng, game->cam.surface);
@@ -249,8 +254,6 @@ static inline int __loop(t_engine *eng, t_data *game, double dt)
 			  game->cam.surface->size[x] * game->cam.surface->size[y] * sizeof(float));
 	ft_clear(eng, (t_color){0xFFFFFF});
 
-	// Get cam dir
-	// t_v3f cam_dir = v3frot((t_v3f){1.f, 0.f, 0.f}, game->cam.rot);
 
 	// Display the sphere
 	mesh_put(eng, &game->cam, (t_transform){{0.f, 0.f}, {.0125f, .0125f, .0125f}, target}, &game->sphere);
