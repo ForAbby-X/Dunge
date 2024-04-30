@@ -64,9 +64,12 @@ SRC		=	main.c \
 			mesh/utils.c \
 			mesh/transform.c \
 			 \
+			FABRIK/manager.c \
+			 \
 			# particle/manager.c \
 			# particle/generic.c \
 			# particle/others.c \
+
 
 INC		=	vec3.h \
 			camera.h \
@@ -77,10 +80,11 @@ INC		=	vec3.h \
 			aabb.h \
 			menu.h \
 			model.h \
+			FABRIK.h \
 
 OBJ		= $(addprefix $(OBJDIR)/,$(SRC:.c=.o))
 
-DEPENDS := $(patsubst %.o,%.d,$(OBJ))
+DEPENDS := $(patsubst %.o, %.d, $(OBJ))
 
 
 # compiler
