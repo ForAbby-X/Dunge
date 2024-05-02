@@ -6,7 +6,7 @@
 /*   By: alde-fre <alde-fre@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/06/21 10:37:59 by vmuller           #+#    #+#             */
-/*   Updated: 2024/05/01 16:52:33 by alde-fre         ###   ########.fr       */
+/*   Updated: 2024/05/02 17:49:48 by alde-fre         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,6 +22,7 @@ typedef struct s_data
 
 	t_mesh		sphere;
 	t_mesh		cube;
+	t_mesh		grid;
 
 	t_v3f		pos;
 	t_v2f		rot;
@@ -47,10 +48,15 @@ void ftree_render(t_engine *const eng, t_camera *const cam, t_data *const game, 
 		t_v2f const	rot = v3flook(segment->pos, next_segment->pos);
 
 		t_transform	trans;
-		trans.rotation = rot;
-		trans.resize = (t_v3f){segment->size, 0.1f, 0.1f};
-		trans.translation = segment->pos + v3frot((t_v3f){segment->size / 2.f}, rot);
-		mesh_put(eng, cam, trans, &game->cube);
+
+		if (i < (int)vector_size(&tree->segments) - 1)
+		{
+
+			trans.resize = (t_v3f){segment->size, 0.2f, 0.2f};
+			trans.translation = segment->pos + v3frot((t_v3f){segment->size / 2.f}, rot);
+			trans.rotation = rot;
+			mesh_put(eng, cam, trans, &game->grid);
+		}
 
 		trans.rotation = (t_v2f){0.f, 0.f};
 		trans.resize = (t_v3f){0.2f, 0.2f, 0.2f};
@@ -81,6 +87,7 @@ static inline void __init(t_engine *const eng, t_data *game)
 {
 	game->sphere = mesh_load(eng, "models/sphere1.obj");
 	game->cube = mesh_load(eng, "models/cube1.obj");
+	game->grid = mesh_load(eng, "models/grid.obj");
 
 	game->pos = (t_v3f){0, 0, 0};
 	game->rot = (t_v2f){0, 0};
@@ -90,12 +97,12 @@ static inline void __init(t_engine *const eng, t_data *game)
 	game->cam.rot = (t_v2f){0.0f, 0.0f};
 	camera_update(&game->cam);
 
-	game->ftree = ftree_create((t_v3f){0.f, 0.f, 0.f}, (t_v3f){0.f, 1.f, 0.f}, (t_v3f){0.f, 5.f, 0.f});
+	game->ftree = ftree_create((t_v3f){0.f, 1.f, 0.f}, (t_v3f){0.f, -1.f, 0.f}, (t_v3f){0.f, 5.f, 0.f});
 
 	for (int i = 0; i < 40; i++)
 	{
-		// float	ratio = i / 40.f;
-		ftree_add_segment(&game->ftree, (t_v3f){0.f, i, 0.f}, 0.2f, (t_constraint){CONICAL, M_PI_2 * 0.5f});
+		float	ratio = (float)i / 40.f;
+		ftree_add_segment(&game->ftree, (t_v3f){0.f, 0.f, 0.f}, 0.1f, (t_constraint){CONICAL, M_PI_2 * ratio});
 	}
 
 	game->time = 0.0;

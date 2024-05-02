@@ -6,7 +6,7 @@
 /*   By: alde-fre <alde-fre@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/06/21 10:37:59 by vmuller           #+#    #+#             */
-/*   Updated: 2024/05/01 16:55:03 by alde-fre         ###   ########.fr       */
+/*   Updated: 2024/05/02 17:24:51 by alde-fre         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -58,11 +58,10 @@ struct s_fsegment
 
 struct s_ftree
 {
-	t_vector	segments;
-	t_fsegment	origin;
-	t_v3f		origin_direction;
-	t_constraint		origin_constraint;
-	t_fsegment	target;
+	t_vector		segments;
+	t_fsegment		origin;
+	t_v3f			origin_direction;
+	t_fsegment		target;
 };
 
 #endif
