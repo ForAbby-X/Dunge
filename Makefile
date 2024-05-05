@@ -20,6 +20,9 @@ OBJDIR	=	./obj
 # src / includes / obj files
 SRC		=	main.c \
 			 \
+			game/init.c \
+			game/destroy.c \
+			 \
 			vec3/algorithm.c \
 			vec3/rotation.c \
 			vec3/convertion.c \
@@ -63,6 +66,12 @@ SRC		=	main.c \
 			mesh/rasteriser.c \
 			mesh/utils.c \
 			mesh/transform.c \
+			 \
+			entity/manager.c \
+			entity/collisions.c \
+			entity/aabb_screen.c \
+			entity/generic/manager.c \
+			entity/player/manager.c \
 			 \
 			FABRIK/manager.c \
 			 \
