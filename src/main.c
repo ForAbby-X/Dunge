@@ -6,7 +6,7 @@
 /*   By: alde-fre <alde-fre@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/06/21 10:37:59 by vmuller           #+#    #+#             */
-/*   Updated: 2024/05/02 17:49:48 by alde-fre         ###   ########.fr       */
+/*   Updated: 2024/05/05 12:35:03 by alde-fre         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,6 +29,8 @@ typedef struct s_data
 
 	t_ftree		ftree;
 	t_v3f		target;
+
+	t_v2f		rotation;
 
 	float		time;
 }	t_data;
@@ -98,12 +100,14 @@ static inline void __init(t_engine *const eng, t_data *game)
 	camera_update(&game->cam);
 
 	game->ftree = ftree_create((t_v3f){0.f, 1.f, 0.f}, (t_v3f){0.f, -1.f, 0.f}, (t_v3f){0.f, 5.f, 0.f});
-
-	for (int i = 0; i < 40; i++)
+	for (int i = 0; i < 6; i++)
 	{
-		float	ratio = (float)i / 40.f;
-		ftree_add_segment(&game->ftree, (t_v3f){0.f, 0.f, 0.f}, 0.1f, (t_constraint){CONICAL, M_PI_2 * ratio});
+		// float	ratio = (float)i / 40.f;
+		ftree_add_segment(&game->ftree, (t_v3f){0.f, 0.f, 0.f}, 1.0f, (t_constraint){CONICAL, M_PI_2});
 	}
+	game->target = (t_v3f){0.f, 0.f, 0.f};
+
+	game->rotation = (t_v2f){0.0f, -M_PI_2};
 
 	game->time = 0.0;
 
@@ -115,7 +119,7 @@ static inline void __control(
 	t_data *const game,
 	float const dt)
 {
-	t_v3f const	dir = {cosf(game->cam.rot[x]), 0.f, sinf(game->cam.rot[x])};
+	t_v3f const	dir = (t_v3f){cosf(game->cam.rot[x]), 0.f, sinf(game->cam.rot[x])} * 0.8f;
 	t_v3f		vel;
 
 	vel = (t_v3f){0};
@@ -142,6 +146,8 @@ static inline void __control(
 	game->cam.pos += vel * dt * 2.f;
 }
 
+///////////////////////////////////////////////////////
+
 static inline int __loop(t_engine *eng, t_data *game, double dt)
 {
 	t_transform trans;
@@ -159,10 +165,15 @@ static inline int __loop(t_engine *eng, t_data *game, double dt)
 	t_v3f cam_dir = v3frot((t_v3f){1.f, 0.f, 0.f}, game->cam.rot);
 	t_v3f target = game->cam.pos + cam_dir * __ray_plane(cam_dir, game->cam.pos, (t_v3f){0.f, 0.f, 0.f});
 	// target[y] = 0.01f;
-	// target = game->target;
+	(void)__ray_plane;
+	// game->target += (game->cam.pos - game->target) * 0.5f * (float)dt;
+	// t_v3f	target = game->target;
 
+	
+	
 	ftree_set_target(&game->ftree, target);
 	ftree_solve(&game->ftree);
+	
 
 	camera_update(&game->cam);
 	ft_eng_sel_spr(eng, game->cam.surface);
@@ -171,12 +182,23 @@ static inline int __loop(t_engine *eng, t_data *game, double dt)
 	ft_clear(eng, (t_color){0xFFFFFF});
 
 	// Display the sphere
-	mesh_put(eng, &game->cam, (t_transform){{0.f, 0.f}, {.0125f, .0125f, .0125f}, target}, &game->sphere);
+	// mesh_put(eng, &game->cam, (t_transform){{0.f, 0.f}, {.0125f, .0125f, .0125f}, target}, &game->sphere);
 
 	// Display the cube
-	mesh_put(eng, &game->cam, (t_transform){{0.f, 0.f}, {0.125f, 0.125f, 0.125f}, (t_v3f){0.f, 0.f, 0.f}}, &game->sphere);
+	mesh_put(eng, &game->cam, (t_transform){{0.f, 0.f}, (t_v3f){0.125f, 0.125f, 0.125f} / 2.f, {0.f, 0.f, 0.f}}, &game->sphere);
 
 	ftree_render(eng, &game->cam, game, &game->ftree);
+
+	// Display the grid
+	// t_v3f const	dir_to_cam = __limit_rotation(game->cam.pos, (t_v3f){0.f, 1.f, 0.f}, M_PI_2 * 0.5f);
+
+	// printf("dir_to_cam: %f %f %f\n", dir_to_cam[x], dir_to_cam[y], dir_to_cam[z]);
+
+	// mesh_put(eng, &game->cam, (t_transform){
+	// 	v3flook((t_v3f){0.f, 0.f, 0.f}, dir_to_cam),
+	// 	{0.25f, 0.01f, 0.01f},
+	// 	{0.f, 0.f, 0.f}
+	// 	}, &game->cube);
 
 	ft_eng_sel_spr(eng, NULL);
 	ft_put_sprite(eng, game->cam.surface, (t_v2i){0, 0});

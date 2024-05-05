@@ -6,7 +6,7 @@
 /*   By: alde-fre <alde-fre@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/06/21 10:37:59 by vmuller           #+#    #+#             */
-/*   Updated: 2024/05/02 17:55:19 by alde-fre         ###   ########.fr       */
+/*   Updated: 2024/05/05 12:34:25 by alde-fre         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -96,16 +96,19 @@ static inline t_v3f __slerp(t_v3f p0, t_v3f p1, float const t)
 
 static inline t_v3f __limit_rotation(t_v3f direction, t_v3f cone_direction, float const cone_angle)
 {
-	float const	current_angle = __angle_between_vec(direction, cone_direction);
+	float		current_angle = __angle_between_vec(direction, cone_direction);
 	t_v3f		rectified_dir;
 
 	rectified_dir = direction;
 	if (current_angle > cone_angle)
 	{
+		// if (current_angle < 0.0001f)
+		// 	current_angle += rand() / (float)RAND_MAX * 0.0001f;
+
 		float	percentage_to_edge = cone_angle / current_angle;
 		
-		rectified_dir = __slerp(rectified_dir, cone_direction, percentage_to_edge);
-		rectified_dir = v3fnorm(cone_direction, v3fmag(direction));
+		rectified_dir = __slerp(cone_direction, rectified_dir, percentage_to_edge);
+		// rectified_dir = v3fnorm(cone_direction, v3f(direction));
 	}
 	return (rectified_dir);
 }
@@ -115,7 +118,7 @@ static inline t_v3f __limit_rotation(t_v3f direction, t_v3f cone_direction, floa
 static inline t_v3f	__ftree_constrain_between(t_ftree *const tree, t_fsegment *const segment)
 {
 	// TODO: add constraint type (for now only CONICAL constraint is implemented)
-
+	
 	t_fsegment		*before_segment = ftree_get_segment(tree, segment->id - 1);
 	t_fsegment		*after_segment = ftree_get_segment(tree, segment->id + 1);
 
@@ -129,7 +132,6 @@ static inline t_v3f	__ftree_constrain_between(t_ftree *const tree, t_fsegment *c
 	return (rectified_diff);
 }
 
-// TODO: implement __ftree_constrain_between_rev (reverse constraint for backward solving)
 static inline t_v3f	__ftree_constrain_between_rev(t_ftree *const tree, t_fsegment *const segment)
 {
 	// TODO: add constraint type (for now only CONICAL constraint is implemented)
@@ -137,12 +139,12 @@ static inline t_v3f	__ftree_constrain_between_rev(t_ftree *const tree, t_fsegmen
 	t_fsegment		*before_segment = ftree_get_segment(tree, segment->id - 1);
 	t_fsegment		*after_segment = ftree_get_segment(tree, segment->id + 1);
 
-	t_constraint	constraint = segment->constraint;
-
+	t_constraint	constraint = before_segment->constraint;
+	
 	t_v3f			before_to_actual = segment->pos - before_segment->pos;
 	t_v3f			actual_to_after = after_segment->pos - segment->pos;
 
-	t_v3f			rectified_diff = __limit_rotation(actual_to_after, before_to_actual, constraint.value);
+	t_v3f			rectified_diff = __limit_rotation(-before_to_actual, -actual_to_after, constraint.value);
 
 	return (rectified_diff);
 }
@@ -159,12 +161,16 @@ static inline void	__ftree_solve_backward(t_ftree *const tree)
 
 
 		if (i == (int)vector_size(&tree->segments) - 1)
-			segment->pos = next_segment->pos;
+		{
+			segment->pos = tree->target.pos - v3fnorm(tree->target.pos - segment->pos, 0.0001f);
+		}
 		else
 		{
-			t_v3f	difference = next_segment->pos - segment->pos;
+			t_v3f	corrected_dir = __ftree_constrain_between_rev(tree, next_segment);
+			// (void)__ftree_constrain_between_rev;
+			// t_v3f 	corrected_dir = segment->pos - next_segment->pos;
 
-			segment->pos = next_segment->pos - v3fnorm(difference, segment->size);
+			segment->pos = next_segment->pos + v3fnorm(corrected_dir, next_segment->size);
 		}
 		
 		--i;
@@ -183,11 +189,13 @@ static inline void	__ftree_solve_forward(t_ftree *const tree)
 
 		if (i == 0)
 		{	
-			segment->pos = tree->origin.pos + v3fnorm(tree->origin_direction, 0.00001f);
+			segment->pos = tree->origin.pos + v3fnorm(tree->origin_direction, 0.0001f);
 		}
 		else
 		{
 			t_v3f	corrected_dir = __ftree_constrain_between(tree, prev_segment);
+			// (void)__ftree_constrain_between;
+			// t_v3f 	corrected_dir = segment->pos - prev_segment->pos;
 
 			segment->pos = prev_segment->pos + v3fnorm(corrected_dir, prev_segment->size);
 		}
