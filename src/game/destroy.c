@@ -6,7 +6,7 @@
 /*   By: alde-fre <alde-fre@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/10/13 06:06:05 by alde-fre          #+#    #+#             */
-/*   Updated: 2024/05/05 14:09:16 by alde-fre         ###   ########.fr       */
+/*   Updated: 2024/05/06 09:26:08 by alde-fre         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,9 +23,7 @@ void	game_models_destroy(t_data *const game)
 
 void	game_destroy(t_data *const game)
 {
-	camera_destroy(&game->cam);
 	vector_destroy(&game->entities);
-	if (game->cam.surface)
-		camera_destroy(&game->cam);
+	camera_destroy(&game->cam);
 	game_models_destroy(game);
 }

@@ -6,7 +6,7 @@
 /*   By: alde-fre <alde-fre@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/06/21 10:37:59 by vmuller           #+#    #+#             */
-/*   Updated: 2024/05/05 12:34:25 by alde-fre         ###   ########.fr       */
+/*   Updated: 2024/05/06 11:42:55 by alde-fre         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -118,9 +118,12 @@ static inline t_v3f __limit_rotation(t_v3f direction, t_v3f cone_direction, floa
 static inline t_v3f	__ftree_constrain_between(t_ftree *const tree, t_fsegment *const segment)
 {
 	// TODO: add constraint type (for now only CONICAL constraint is implemented)
+	if (segment->id == 0)
+		return (v3fnorm(tree->origin_direction, segment->size));
 	
 	t_fsegment		*before_segment = ftree_get_segment(tree, segment->id - 1);
 	t_fsegment		*after_segment = ftree_get_segment(tree, segment->id + 1);
+
 
 	t_constraint	constraint = segment->constraint;
 
